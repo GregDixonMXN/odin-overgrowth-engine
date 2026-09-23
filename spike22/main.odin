@@ -194,15 +194,16 @@ main :: proc() {
     rl.SetMasterVolume(g_master_vol)
     rl.SetExitKey(.KEY_NULL) // ESC opens the pause menu, not the window
 
-    player := make_fighter("../assets/shki_base.glb", {255, 255, 255, 255}, 1.0, "../assets/shki_albedo.png")
+    // ASSETDROP HERO: 27-node rig driven by the shared shki clips via
+    // name-mapped retarget (see src_map in make_fighter). Same sim,
+    // new mesh.
+    player := make_fighter("../assets/assetdrop_base.glb", {255, 255, 255, 255}, 1.0, "../assets/assetdrop_albedo.png")
     player.is_player = true
     player.team = 0
     player.name = "player"
     player.max_hp = 5
     player.hp = 5
     player.atk_rate = 1.5 // player swings faster (enemies stay readable)
-    g_shki_bind_t = player.base_t // retarget reference for cross-rig fighters
-    g_shki_bind_n = player.nn
     // LUNK BRUTE: same rig at 0.12 scale (~3m), slower, hits for 2, kick-only AI
     dummy := make_fighter("../assets/lunk_base.glb", {255, 130, 130, 255}, 0.12, "../assets/lunk_albedo.png", "../assets/lunk_normal.png")
     dummy.is_player = false
@@ -234,6 +235,11 @@ main :: proc() {
     cut.ai_aggr = 0.5 // cutthroat: circles, darts in, gives ground
     cut.ai_range = 2.8 // sword reach (was 2.3 fists)
     cut.ai_dir = -1.0
+    // retarget reference must come from a shki-layout fighter (the player
+    // is the assetdrop rig now); cut loads the same shki_base.glb the
+    // player used to, so the reference is byte-identical to before.
+    g_shki_bind_t = cut.base_t
+    g_shki_bind_n = cut.nn
     // ALLY: green shki slasher on your side. Escorts you (regroups past
     // 6m), fights your nearest foe, sidesteps like the cut (aggr 0.6).
     // Spawned off the scripted demo path so auto stays clean.

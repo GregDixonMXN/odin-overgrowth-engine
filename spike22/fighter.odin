@@ -112,6 +112,11 @@ Fighter :: struct {
     flash_t: f32,     // hit-flash timer (seconds)
     has_sword: bool,  // rigid sword prop riding the right hand (node 47)
     sword_idx: int,   // prim index of the sword (-1 = none)
+    hand_node: int,   // RightHand node (resolved by name; 47 on shki, 12 on assetdrop)
+    world_unscale: f32, // 100 on stale-cm rigs (shki), 1 on true-scale rigs
+    same_rig: bool,   // node-for-node shki layout (identity clip map)
+    src_map: []int,   // fighter node -> shki clip node (-1 = hold bind)
+    retarget_k: f32,  // clip->local translation unit scale (cm deltas to local units)
     // foot-IK state: leg chains (up/knee/foot node per side), bind bone
     // lengths, smoothed plant heights (world), prev ankle pos (world)
     leg_idx: [6]int,   // L up/knee/foot, R up/knee/foot
@@ -167,6 +172,48 @@ make_fighter :: proc(base_path: string, tint: rl.Color, model_scale: f32, albedo
     }
     f.is_root = make([]bool, nn)
     for i in 0 ..< nn { f.is_root[i] = data.nodes[i].parent == nil }
+    // cross-rig clip map: fighter node -> shki clip node by normalized
+    // joint name (-1 = no counterpart: holds bind). 67-node shki/lunk
+    // rigs map identity; the 27-node assetdrop rig maps its major
+    // joints and holds the extras (toes, head tips) at bind.
+    assert(len(g_shki_names) > 0, "shared anims must load before fighters")
+    f.src_map = make([]int, nn)
+    for i in 0 ..< nn {
+        f.src_map[i] = -1
+        for j in 0 ..< len(g_shki_names) {
+            if joint_matches(string(data.nodes[i].name), g_shki_names[j]) { f.src_map[i] = j; break }
+        }
+    }
+    // same rig = clip layout: every mapped node sits at its own index.
+    // Unmapped nodes (lunk's renamed mesh holder) hold bind, exactly as
+    // before when they carried no channels. Count alone is not enough.
+    f.same_rig = (nn == len(g_shki_names))
+    if f.same_rig {
+        for i in 0 ..< nn {
+            if f.src_map[i] >= 0 && f.src_map[i] != i { f.same_rig = false; break }
+        }
+    }
+    f.hand_node = find_joint(data, "mixamorig:RightHand")
+    // world-matrix scale probe: stale-cm rigs (shki 0.01 Armature) shrink
+    // the rotation block 100x and rigid props must unscale; true-scale
+    // rigs (assetdrop, baked to meters) ride at 1:1. Measured against
+    // model_scale (which also shrinks bind worlds, e.g. lunk 0.12).
+    f.world_unscale = 1
+    f.retarget_k = 1
+    if hi := find_joint(data, "mixamorig:Hips"); hi >= 0 {
+        hw: [16]f32
+        gltf.node_transform_world(&data.nodes[hi], &hw[0])
+        cn := linalg.length([3]f32{hw[0], hw[1], hw[2]})
+        if cn > 1e-9 { f.world_unscale = f.model_scale / cn }
+        // clip translation deltas ship in shki-clip units (cm convention:
+        // stale 0.01 Armature scale). Convert to this rig's local units:
+        // meters = d_cm * 0.01, local = meters / net_scale, where
+        // net_scale (rotation-block column norm x model_scale) is what
+        // scales this rig's translations into the world.
+        if cn * f.model_scale > 1e-9 { f.retarget_k = 0.01 / (cn * f.model_scale) }
+        fmt.printf("%s rig: nn=%d same_rig=%v hand=%d unscale=%.2f retarget_k=%.3f hips_y=%.2f\n",
+            base_path, nn, f.same_rig, f.hand_node, f.world_unscale, f.retarget_k, hw[13])
+    }
 
     // albedo texture (per-fighter file, per-fighter GPU copy)
     tex: rl.Texture2D
@@ -272,8 +319,30 @@ make_fighter :: proc(base_path: string, tint: rl.Color, model_scale: f32, albedo
                 for i in 0 ..< n {
                     ju: [4]c.uint
                     _ = gltf.accessor_read_uint(ajt, uint(i), &ju[0], 4)
-                    all_joints[i] = {u16(ju[0]), u16(ju[1]), u16(ju[2]), u16(ju[3])}
                     _ = gltf.accessor_read_float(awt, uint(i), &all_weights[i][0], 4)
+                    // loader hardening: some exports park 255 in unused
+                    // joint slots, ship negative weights, or skip
+                    // normalization. Any of those reads outside the
+                    // palette or inverts verts, so clamp joint range,
+                    // drop non-positive weights, renormalize. No-op on
+                    // clean rigs (shki/lunk measure 0/0/0 on all three).
+                    s := f32(0)
+                    for k in 0 ..< 4 {
+                        if int(ju[k]) >= nj || all_weights[i][k] <= 0 {
+                            all_joints[i][k] = 0
+                            all_weights[i][k] = 0
+                        } else {
+                            all_joints[i][k] = u16(ju[k])
+                            s += all_weights[i][k]
+                        }
+                    }
+                    if s > 1e-6 {
+                        for k in 0 ..< 4 { all_weights[i][k] /= s }
+                    } else {
+                        // orphan vert: pin to joint 0 (rest pose, never flings)
+                        all_joints[i] = [4]u16{0, 0, 0, 0}
+                        all_weights[i] = [4]f32{1, 0, 0, 0}
+                    }
                 }
             }
             mat := rl.LoadMaterialDefault()
@@ -401,7 +470,7 @@ make_fighter :: proc(base_path: string, tint: rl.Color, model_scale: f32, albedo
     // currently hold the scaled bind pose, so lengths are model meters)
     leg_names := [6]string{"mixamorig:LeftUpLeg", "mixamorig:LeftLeg", "mixamorig:LeftFoot", "mixamorig:RightUpLeg", "mixamorig:RightLeg", "mixamorig:RightFoot"}
     for li in 0 ..< 6 {
-        f.leg_idx[li] = find_node(data, leg_names[li])
+        f.leg_idx[li] = find_joint(data, leg_names[li])
     }
     if f.leg_idx[0] >= 0 && f.leg_idx[1] >= 0 && f.leg_idx[2] >= 0 &&
        f.leg_idx[3] >= 0 && f.leg_idx[4] >= 0 && f.leg_idx[5] >= 0 {
@@ -432,8 +501,8 @@ make_fighter :: proc(base_path: string, tint: rl.Color, model_scale: f32, albedo
 }
 
 // rigid sword prop: loads assets/sword.glb once per fighter as an
-// unskinned prim; render_fighter re-seats it on RightHand (node 47)
-// every frame from f.world, so it tracks anim AND ragdoll.
+// unskinned prim; render_fighter re-seats it on f.hand_node every frame
+// from f.world, so it tracks anim AND ragdoll.
 fighter_give_sword :: proc(f: ^Fighter, albedo_path, normal_path: string) {
     opts: gltf.options
     path := "../assets/sword.glb"
@@ -492,7 +561,7 @@ fighter_give_sword :: proc(f: ^Fighter, albedo_path, normal_path: string) {
     }
     mat.maps[0].color = rl.WHITE
     rm: [16]f32 = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
-    append(&f.prims, Skinned_Prim{mesh, mat, n, verts, nrms, dst, dstn, nil, nil, 47, rm, false, true, nil, nil, -1, nil})
+    append(&f.prims, Skinned_Prim{mesh, mat, n, verts, nrms, dst, dstn, nil, nil, f.hand_node, rm, false, true, nil, nil, -1, nil})
     f.sword_idx = len(f.prims) - 1
     f.has_sword = true
     fmt.printf("sword: %d verts on %s\n", n, "fighter" if f.is_player else "enemy")

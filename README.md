@@ -91,8 +91,12 @@ lines and the `sfx: N sounds` init line, which drifts as wavs are added.
 The engine loads its cast from `../assets/` at runtime. Nothing in that
 folder is committed (see `.gitignore`). Expected files:
 
-- Fighters: `shki_base.glb` (+ `shki_albedo.png`), `lunk_base.glb`
-  (+ `lunk_albedo.png`, `lunk_normal.png`) — base meshes.
+- Fighters: `assetdrop_base.glb` (+ `assetdrop_albedo.png`) for the
+  player — any 27+ node Mixamo-style rig works, joints are found by
+  name and the shki clips retarget by bind-relative delta transfer
+  (`src_map` + `retarget_k` in `spike22/fighter.odin`). `shki_base.glb`
+  (+ `shki_albedo.png`), `lunk_base.glb` (+ `lunk_albedo.png`,
+  `lunk_normal.png`) — the other cast members.
 - Clips: `shki_idle.glb`, `shki_run.glb`, `shki_jump.glb`,
   `shki_slash.glb`, `shki_death.glb` — one action per file, same rig.
 - Props: `sword.glb` (+ `sword_albedo.png`, `sword_normal.png`),

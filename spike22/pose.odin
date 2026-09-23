@@ -99,14 +99,31 @@ pose_apply :: proc(f: ^Fighter, ctx: ^Ctx, b: ^Pose_Blend) {
         for c in 0 ..< 5 {
             if cw[c] <= 0 { continue }
             for i in 0 ..< nn {
+                // cross-rig sampling: fighter node i is driven by its
+                // name-mapped shki clip node. -1 = no counterpart (extra
+                // toes, head tips): holds bind. Identity on shki rigs.
+                src := f.src_map[i]
+                if src < 0 { continue }
                 nd: ^gltf.node
                 switch c {
-                case 0: nd = &sh.idata.nodes[i]
-                case 1: nd = &sh.rdata.nodes[i]
-                case 2, 3: nd = &sh.jdata.nodes[i]
+                case 0:
+                    if src >= len(sh.idata.nodes) { continue }
+                    nd = &sh.idata.nodes[src]
+                case 1:
+                    if src >= len(sh.rdata.nodes) { continue }
+                    nd = &sh.rdata.nodes[src]
+                case 2, 3:
+                    if src >= len(sh.jdata.nodes) { continue }
+                    nd = &sh.jdata.nodes[src]
                 case 4:
                     // attack slot: slash/kick live in sdata, death in ddata
-                    nd = &sh.ddata.nodes[i] if clips[4] == sh.death else &sh.sdata.nodes[i]
+                    if clips[4] == sh.death {
+                        if src >= len(sh.ddata.nodes) { continue }
+                        nd = &sh.ddata.nodes[src]
+                    } else {
+                        if src >= len(sh.sdata.nodes) { continue }
+                        nd = &sh.sdata.nodes[src]
+                    }
                 case: nd = &data.nodes[i]
                 }
                 v3: [3]f32
@@ -143,20 +160,24 @@ pose_apply :: proc(f: ^Fighter, ctx: ^Ctx, b: ^Pose_Blend) {
             if f.is_root[i] {
                 nd.has_translation = false
                 nd.translation = {0, 0, 0}
-            } else if f.model_scale == 1.0 {
+            } else if f.same_rig && f.model_scale == 1.0 {
                 // same-rig: translations carry over; retargeted rigs keep
-                // their own (scaled) bind translations — clip translations
-                // encode shki bone lengths, not lunk's
+                // their own bind translations — clip translations encode
+                // shki bone lengths, not the target's
                 nd.translation = f.samp_t[i] * f.model_scale; nd.has_translation = true
-            } else if i < g_shki_bind_n {
+            } else if src := f.src_map[i]; src >= 0 && src < g_shki_bind_n {
                 // cross-rig: bind-relative delta transfer. Clip rotations
                 // need matching centers: pose = our bind + the clip's
-                // deviation from SHKI bind, scaled by overall size ratio.
+                // deviation from SHKI bind. The deviation ships in
+                // shki-clip units (cm convention), so it is scaled by
+                // retarget_k into this rig's local units (0.01 for
+                // meter rigs). lunk-scale rigs keep the legacy 1.2.
                 // (Pure rotation-copy rips parts off on lever arms; a
                 // per-joint magnitude ratio is fooled by stance offsets.)
-                sb := g_shki_bind_t[i]
+                sb := g_shki_bind_t[src]
                 d := f.samp_t[i] - sb
-                nd.translation = f.base_t[i] + d * 1.2; nd.has_translation = true
+                k := f32(1.2) if f.same_rig else f.retarget_k
+                nd.translation = f.base_t[i] + d * k; nd.has_translation = true
             }
             nd.rotation = f.samp_r[i]; nd.has_rotation = true
             nd.scale = f.samp_s[i]; nd.has_scale = true
@@ -285,14 +306,17 @@ render_fighter :: proc(f: ^Fighter) {
         }
     }
     if f.has_sword && f.sword_idx >= 0 && f.sword_idx < len(f.prims) {
-        // re-seat the sword on RightHand every frame (anim + ragdoll both
+        // re-seat the sword on the hand every frame (anim + ragdoll both
         // recompute f.world). Grip maps blade -z onto hand -y (fist line).
-        // NOTE: the shki rig carries a stale 0.01 Armature scale, so every
-        // world matrix is 100x shrunk (skin survives via IBM cancelling it;
-        // translations are true meters). Unscale for the rigid prop.
+        // NOTE: stale-cm rigs (shki) carry 0.01 Armature scale, so every
+        // world matrix is 100x shrunk in rotation (skin survives via IBM
+        // cancelling it; translations are true meters). Unscale for the
+        // rigid prop; true-scale rigs (assetdrop) ride at 1:1.
+        // f.world_unscale is measured per rig at build, not assumed.
         SWORD_GRIP := [16]f32{1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1}
-        SWORD_UNSCALE := [16]f32{100, 0, 0, 0, 0, 100, 0, 0, 0, 0, 100, 0, 0, 0, 0, 1}
-        f.prims[f.sword_idx].rigid_m = mul_col(mul_col(f.world[47], SWORD_UNSCALE), SWORD_GRIP)
+        uni := f.world_unscale
+        SWORD_UNSCALE := [16]f32{uni, 0, 0, 0, 0, uni, 0, 0, 0, 0, uni, 0, 0, 0, 0, 1}
+        f.prims[f.sword_idx].rigid_m = mul_col(mul_col(f.world[f.hand_node], SWORD_UNSCALE), SWORD_GRIP)
     }
     for &pr, i in f.prims {
         if pr.skinned {

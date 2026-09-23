@@ -965,7 +965,7 @@ combat_sever :: proc(foe: ^Fighter, ctx: ^Ctx, atk: ^Fighter, dn: [3]f32, drop, 
         rv := [3]f32{math.cos(foe.yaw), 0, -math.sin(foe.yaw)} // victim right
         if dn.x * rv.x + dn.z * rv.z > 0 { name = "mixamorig:RightArm" }
     }
-    sn := find_node(foe.data, name)
+    sn := find_joint(foe.data, name)
     if sn < 0 { return false }
     // palette set: joints whose node sits in the severed subtree
     in_sev := make([]bool, foe.nj)

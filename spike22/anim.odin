@@ -75,6 +75,7 @@ Shared_Anims :: struct {
 
 g_shki_bind_t: [][3]f32 // shki file bind translations (retarget reference)
 g_shki_bind_n: int
+g_shki_names: []string // normalized-name source list for cross-rig maps (never freed)
 
 // IBM must invert OUR bind worlds (scaled translations), not the
 // file's — for scale 1 this reproduces the file IBM exactly.
@@ -113,6 +114,10 @@ load_shared_anims :: proc() -> Shared_Anims {
         sh.ddata = load(opts, "../assets/shki_death.glb")
         _ = base
         assert(len(sh.idata.nodes) == 67 && len(sh.rdata.nodes) == 67 && len(sh.jdata.nodes) == 67 && len(sh.sdata.nodes) == 67 && len(sh.ddata.nodes) == 67, "rig mismatch")
+        // source-name table for cross-rig node maps (raw names; matching
+        // normalizes both sides, so 67- and 27-node rigs share one table)
+        g_shki_names = make([]string, len(sh.idata.nodes))
+        for i in 0 ..< len(sh.idata.nodes) { g_shki_names[i] = string(sh.idata.nodes[i].name) }
         sh.idle = &sh.idata.animations[0]
         sh.run  = &sh.rdata.animations[1] if len(sh.rdata.animations) >= 2 else &sh.rdata.animations[0]
         sh.air  = &sh.jdata.animations[0]

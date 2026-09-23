@@ -119,6 +119,40 @@ find_node :: proc(data: ^gltf.data, name: string) -> int {
     return -1
 }
 
+// rig-agnostic joint lookup: strips the mixamorig: prefix, compares
+// case-insensitively, and unifies Spine01/Spine02 with Spine1/Spine2.
+// Lets one joint table drive 67-node Mixamo rigs and the 27-node
+// assetdrop rig alike. Allocation-free (stack buffers, load-time use).
+joint_matches :: proc(a, b: string) -> bool {
+    ba, bb: [64]u8
+    na := norm_joint_into(a, &ba)
+    nb := norm_joint_into(b, &bb)
+    if na == "spine01" { na = "spine1" }
+    if na == "spine02" { na = "spine2" }
+    if nb == "spine01" { nb = "spine1" }
+    if nb == "spine02" { nb = "spine2" }
+    return na == nb
+}
+
+norm_joint_into :: proc(s: string, buf: ^[64]u8) -> string {
+    t := s
+    if len(t) > 10 && t[:10] == "mixamorig:" { t = t[10:] }
+    n := min(len(t), 64)
+    for i in 0 ..< n {
+        c := t[i]
+        if c >= 'A' && c <= 'Z' { c += 'a' - 'A' }
+        buf[i] = c
+    }
+    return string(buf[:n])
+}
+
+find_joint :: proc(data: ^gltf.data, name: string) -> int {
+    for i in 0 ..< len(data.nodes) {
+        if joint_matches(string(data.nodes[i].name), name) { return i }
+    }
+    return -1
+}
+
 parent_of :: proc(data: ^gltf.data, idx: int) -> int {
     p := data.nodes[idx].parent
     if p == nil { return -1 }

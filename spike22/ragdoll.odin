@@ -51,7 +51,7 @@ make_ragdoll :: proc(f: ^Fighter, bi: ^jph.BodyInterface, physics: ^jph.PhysicsS
         return {bindw[idx][12], bindw[idx][13], bindw[idx][14]}
     }
     for b in 0 ..< RB_N {
-        f.rb_node[b] = find_node(data, RB_PIN[b])
+        f.rb_node[b] = find_joint(data, RB_PIN[b])
         assert(f.rb_node[b] >= 0, "rb pin joint missing")
     }
     hips_b := bpos(bindw, f.rb_node[0])
@@ -69,7 +69,7 @@ make_ragdoll :: proc(f: ^Fighter, bi: ^jph.BodyInterface, physics: ^jph.PhysicsS
         } else if RB_FAR[b] == "" {
             f.rb_bind[b] = bpos(bindw, f.rb_node[b])
         } else {
-            fb := find_node(data, RB_FAR[b])
+            fb := find_joint(data, RB_FAR[b])
             assert(fb >= 0, "rb far joint missing")
             tp := bpos(bindw, f.rb_node[b])
             bp := bpos(bindw, fb)
@@ -93,7 +93,7 @@ make_ragdoll :: proc(f: ^Fighter, bi: ^jph.BodyInterface, physics: ^jph.PhysicsS
         if RB_PARENT[b] < 0 { continue }
         pb := jph.PhysicsSystem_GetBodyPtr(physics, f.rb_ids[RB_PARENT[b]])
         cb := jph.PhysicsSystem_GetBodyPtr(physics, f.rb_ids[b])
-        piv := find_node(data, RB_PIVOT[b])
+        piv := find_joint(data, RB_PIVOT[b])
         assert(piv >= 0, "rb pivot missing")
         pv := bpos(bindw, piv)
         // twist axis = bone direction (pivot -> child body center at bind)
