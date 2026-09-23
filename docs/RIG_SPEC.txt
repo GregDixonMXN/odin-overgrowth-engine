@@ -1,0 +1,76 @@
+RIG + ASSET SPEC (engine contract — follow this and new meshes just work)
+======================================================================
+Read this before exporting anything from Blender. The engine was built
+around Mixamo exports (shki/lunk); these rules keep every new asset
+compatible with the animation, retarget, ragdoll, and IK systems.
+
+1. ONE SKELETON FOR EVERYTHING
+   - A single rig shared by the base mesh file AND every animation file.
+   - Identical joint NAMES and ORDER in all files. The sampler maps
+     channels by node index, so a reordered file silently mis-poses.
+   - Identical bind pose (same local translation/rotation/scale on every
+     joint) in every file. Different binds = different bone lengths =
+     torn meshes (this cost a full day on lunk).
+
+2. HIERARCHY
+   - One root node ("Armature"), whose children are exactly: mesh node(s)
+     + Hips. Nothing else at root level.
+   - Root scale must be UNIFORM (0.01 for cm-authored Mixamo files, or
+     1.0). Non-uniform root scale breaks skinning everywhere.
+   - Bake the Z-up -> Y-up rotation on the root (rotation -90 deg X),
+     exactly like current files. Do not bake it into the mesh instead.
+
+3. FACING + MOTION
+   - Model faces +Z at yaw 0. (Engine yaw 0 = (sin0, cos0) = +Z.)
+   - Animate the HIPS for body motion. Keep the Armature root static:
+     the engine zeroes root translation (root motion is deleted — a
+     traveling clip will look like moonwalking).
+   - In-place cycles: run must be loop-clean (first frame == last frame
+     pose, contact frames matched). Engine matches cycle rate to ground
+     speed, but it cannot fix a non-looping clip.
+
+4. CLIPS (one action per file, like now)
+   - idle / run / jump (airborne part) / land / slash / kick minimum.
+   - Jump: engine plays air once on takeoff, land once on touchdown.
+   - Attacks: strike lands ~35% into the clip. Keep windups readable at
+     1.0x (player plays them at 1.5x).
+   - Name animations Layer0, Layer0.001, ... (Mixamo convention).
+
+5. MESH
+   - Triangulated on export. Under 60k verts per prim (engine splits
+     above raylib's u16 limit, but fewer prims = faster).
+   - UVs required. Albedo + normal PNGs (2048). Normal maps: tangent
+     space, OpenGL convention (+Y up).
+   - Albedo must be the REAL colors. (lunkdiffuse.png shipped pure black
+     and made the brute invisible for a day. Check your PNGs by eye.)
+   - Embedded glb images are ignored except as fallback; prefer sidecar
+     files in assets/ (engine loads albedo + normal by path).
+   - Set material.doubleSided only if the mesh truly needs it (open
+     edges). Closed bodies stay single-sided (faster, correct culling).
+   - Low-poly plan (your call): decimate with skin weights + UVs
+     preserved, same skeleton, mesh swap only. Engine needs no changes.
+
+6. RAGDOLL RELEVANT
+   - Engine finds joints by mixamorig names (Hips, Spine1, Neck, Head,
+     LeftUpLeg/RightUpLeg, LeftLeg/RightLeg, LeftFoot/RightFoot,
+     LeftArm/RightArm, LeftForeArm/RightForeArm, LeftHand/RightHand).
+     Keep these names or update RB_PIN/RB_PIVOT/RB_FAR tables in
+     ragdoll.odin to match.
+   - Keep limbs roughly capsule-shaped; body sizes are measured from
+     bind-pose bone positions automatically.
+
+7. VALIDATE
+   - Drop the .glb in assets/, run: spike4.exe auto assets/<file>
+     Must print sane node/joint counts and pose without errors.
+   - Then point a fighter at it (make_fighter: base path + scale +
+     albedo + normal) and run the spike auto demo.
+   - Feet: ankle joint ~10-15cm above the sole in bind. Engine measures
+     this (ankle_h) for foot IK — extreme values (stilts, hooves) still
+     work, they just plant differently.
+
+8. WHAT UNLOCKS WHEN THIS LANDS
+   - The whole retarget layer deletes: computed IBM, delta-transfer,
+     model_scale, g_shki_bind reference. Sampling becomes direct
+     (clip node i -> mesh node i, translations carried over raw).
+   - Per-rig stats (accel/top/dmg/hp) and tints stay — that's how enemy
+     variety works on one rig.

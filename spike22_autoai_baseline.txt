@@ -1,0 +1,67 @@
+shared clips: air=0.208 land=0.250 slash=1.533 kick=0.433 death=1.000
+sfx: 15 sounds + wind ready
+player prims 2, dummy prims 1, cut prims 2, ally prims 2
+sword: 1234 verts on fighter
+sword: 1234 verts on enemy
+sword: 1234 verts on enemy
+terrain albedo 2048x2048
+terrain normal 2048x2048
+heightfield 512x512 cell=1.96m unset-filled=2044/262144 corridor-mean=0 mean=15.50
+terrain verts=27659 tris=53980
+arena box lo=(-4.9 13.4 7.3) hi=(0.9 17.0 10.7)
+arena box lo=(-4.9 13.4 7.3) hi=(0.9 17.0 10.7)
+arena box lo=(-27.4 11.5 10.6) hi=(-6.6 27.6 26.4)
+arena box lo=(12.0 7.0 9.6) hi=(27.9 17.5 19.2)
+arena box lo=(2.4 13.6 23.4) hi=(3.6 29.3 24.6)
+spawn you=(0.0 16.4) dummy=(2.0 15.4) cut=(3.0 29.3) ally=(-6.0 13.6)
+WARNING: VAO: [ID 19] Trying to re-load an already loaded mesh
+WARNING: VAO: [ID 20] Trying to re-load an already loaded mesh
+f=0 BARK horn: FIRST TO FIVE TAKES IT
+f=0 REDEPLOY standing hp=8
+f=0 you=idle dummy=idle pos=(0.00 16.36 0.00) cam=(0.0 19.6 -3.2)
+   dummy bumper=(0.00 15.57 4.00) ground=15.57 mode=Anim
+   cut bumper=(3.00 29.26 24.00) ground=29.26 mode=Anim
+f=28 ATTACK player slash
+f=36 GRABBED player
+f=78 THROW ally
+f=79 THREW player hp=4
+f=79 BODYHIT dummy hp=7
+f=120 you=ragdoll dummy=ragdoll pos=(-1.11 15.68 2.33) cam=(5.3 20.9 0.2)
+   dummy bumper=(-2.17 15.32 2.69) ground=15.32 mode=Ragdoll
+   cut bumper=(3.00 29.26 24.00) ground=29.26 mode=Anim
+f=230 RECOVER @ [2.079533, 16.875652, 0.7305213]
+f=240 you=run dummy=ragdoll pos=(1.90 16.82 0.78) cam=(5.0 20.0 -0.1)
+   dummy bumper=(-2.17 15.32 2.69) ground=15.32 mode=Ragdoll
+   cut bumper=(3.00 29.26 24.00) ground=29.26 mode=Anim
+f=280 ATTACK player slash
+f=301 JUGGLE dummy
+f=301 STRUCK
+f=305 CHAIN player slash
+f=326 STRUCK
+f=326 DUMMY UP
+f=359 PICKUP ally
+f=360 you=attack dummy=idle pos=(-5.81 14.13 2.96) cam=(-2.7 17.3 2.1)
+   dummy bumper=(-4.09 14.52 4.16) ground=14.52 mode=Anim
+   cut bumper=(3.00 29.26 24.00) ground=29.26 mode=Anim
+f=440 ATTACK player slash
+f=445 ATTACK ally slash
+f=461 STRUCK
+f=477 BLOCKED dummy
+f=480 you=attack dummy=block pos=(-14.84 12.24 5.52) cam=(-11.8 15.4 4.7)
+   dummy bumper=(-2.37 15.29 2.42) ground=15.29 mode=Anim
+   cut bumper=(3.00 29.26 24.00) ground=29.26 mode=Anim
+f=563 ATTACK ally slash
+f=595 BLOCKED dummy
+f=600 you=run dummy=block pos=(-23.89 10.15 8.09) cam=(-20.8 13.3 7.2)
+   dummy bumper=(-4.05 14.46 4.55) ground=14.46 mode=Anim
+   cut bumper=(3.00 29.26 24.00) ground=29.26 mode=Anim
+f=642 ATTACK dummy kick
+f=684 REGEN player hp=5
+f=684 REGEN dummy hp=8
+f=720 you=run dummy=run pos=(-32.93 7.16 10.65) cam=(-29.9 10.4 9.8)
+   dummy bumper=(-4.86 14.35 3.47) ground=14.35 mode=Anim
+   cut bumper=(3.00 29.26 24.00) ground=29.26 mode=Anim
+f=840 you=run dummy=run pos=(-41.98 3.15 13.21) cam=(-38.9 6.4 12.3)
+   dummy bumper=(-11.12 12.87 0.85) ground=12.87 mode=Anim
+   cut bumper=(3.00 29.26 24.00) ground=29.26 mode=Anim
+spike22 done: 900 frames KOs you 0 - 0 foe
